@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:todolist/database_helper.dart';
 import 'package:todolist/todo.dart';
 
 class TodoPage extends StatelessWidget {
@@ -26,16 +27,26 @@ class TodoList extends StatefulWidget {
 class _TodoList extends State<TodoList> {
   TextEditingController _namaCtrl = TextEditingController();
   TextEditingController _deskripsiCtrl = TextEditingController();
-  List<Todo> todoList = Todo.dummyData;
+  TextEditingController _searchCtrl = TextEditingController();
+  List<Todo> todoList = [];
+
+  final dbHelper = DatabaseHelper();
+
+  @override
+  void initState() {
+    super.initState();
+    refreshList();
+  }
 
   void refreshList() async {
+    final todos = await dbHelper.getAllTodos();
     setState(() {
-      todoList = todoList;
+      todoList = todos;
     });
   }
 
   void addItem() async {
-    todoList.add(Todo(_namaCtrl.text, _deskripsiCtrl.text));
+    await dbHelper.addTodo(Todo(_namaCtrl.text, _deskripsiCtrl.text));
     refreshList();
 
     _namaCtrl.text = '';
@@ -44,12 +55,27 @@ class _TodoList extends State<TodoList> {
 
   void updateItem(int index, bool done) async {
     todoList[index].done = done;
+    await dbHelper.updateTodo(todoList[index]);
     refreshList();
   }
 
   void deleteItem(int id) async {
-    todoList.removeAt(id);
+    await dbHelper.deleteTodo(id);
     refreshList();
+  }
+
+  void cariTodo() async {
+    String teks = _searchCtrl.text.trim();
+    List<Todo> todos = [];
+    if (teks.isEmpty) {
+      todos = await dbHelper.getAllTodos();
+    } else {
+      todos = await dbHelper.searchTodo(teks);
+    }
+
+    setState(() {
+      todoList = todos;
+    });
   }
 
   void tampilForm() {
@@ -97,6 +123,20 @@ class _TodoList extends State<TodoList> {
       ),
       body: Column(
         children: [
+          Container(
+            margin: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            child: TextField(
+              onChanged: (_) {
+                cariTodo();
+              },
+              controller: _searchCtrl,
+              decoration: InputDecoration(
+                hintText: 'Cari apa?',
+                prefixIcon: Icon(Icons.search),
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ),
           Expanded(
               child: ListView.builder(
                   itemCount: todoList.length,
@@ -111,7 +151,7 @@ class _TodoList extends State<TodoList> {
                       title: Text(todoList[index].nama),
                       subtitle: Text(todoList[index].deskripsi),
                       trailing: IconButton(
-                        onPressed: () => deleteItem(index),
+                        onPressed: () => deleteItem(todoList[index].id ?? 0),
                         icon: const Icon(Icons.delete),
                       ),
                     );
